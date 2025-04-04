@@ -1,39 +1,4 @@
-#include <uapi/linux/ptrace.h>
-#include <linux/sched.h>
-#include <linux/fs.h>
-#include <bcc/proto.h>
-#include <net/sock.h>
-struct ids_event_t {
-    u32 pid;
-    u32 ppid;
-    u64 timestamp;
-    char comm[TASK_COMM_LEN];
-    char syscall[32];
-    char filename[128];
-    int signal;
-    int new_state;
-    u32 uid;
-    u32 src_ip;
-    u32 dst_ip;
-    u16 src_port;
-    u16 dst_port;
-};
-
-BPF_PERF_OUTPUT(ids_events);
-
-//TRACEPOINT_PROBE(syscalls, syscall_name) { 
-//    struct ids_event_t event = {}; 
-//    event.pid = bpf_get_current_pid_tgid() >> 32; 
-//    struct task_struct *task = (struct task_struct *)bpf_get_current_task(); 
-//    bpf_probe_read(&event.ppid, sizeof(event.ppid), &task->real_parent->tgid); 
-//    event.timestamp = bpf_ktime_get_ns(); 
-//    event.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF; 
-//    event.gid = (bpf_get_current_uid_gid() >> 32) & 0xFFFFFFFF; 
-//    bpf_get_current_comm(&event.comm, sizeof(event.comm)); 
-//    __builtin_memcpy(event.syscall, #syscall_name, sizeof(#syscall_name)); 
-//    ids_events.perf_submit(args, &event, sizeof(event)); 
-//    return 0; 
-//}
+#include <common.h>
 
 TRACEPOINT_PROBE(syscalls, sys_enter_execve) {
     struct ids_event_t event = {};
@@ -43,6 +8,10 @@ TRACEPOINT_PROBE(syscalls, sys_enter_execve) {
     bpf_probe_read_kernel(&event.ppid, sizeof(event.ppid), &task->real_parent->tgid);
     event.timestamp = bpf_ktime_get_ns();
     event.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+    u32 *is_admin = admin_users.lookup(&event.uid);
+    if (is_admin) {
+        return 0;  
+    }
     event.signal = 0;       
     event.new_state = 0; 
     bpf_get_current_comm(&event.comm, sizeof(event.comm));
@@ -62,6 +31,11 @@ TRACEPOINT_PROBE(syscalls, sys_enter_kill) {
     event.new_state = 0;
     event.timestamp = bpf_ktime_get_ns();
     event.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+    u32 *is_admin = admin_users.lookup(&event.uid);
+    if (is_admin) {
+        return 0;          
+    }
+
     bpf_get_current_comm(&event.comm, sizeof(event.comm));
     __builtin_memcpy(event.syscall, "sys_enter_kill", sizeof("sys_enter_kill"));
 
@@ -76,6 +50,11 @@ TRACEPOINT_PROBE(sock, inet_sock_set_state) {
     event.pid = bpf_get_current_pid_tgid() >> 32;
     event.timestamp = bpf_ktime_get_ns();
     event.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
+    u32 *is_admin = admin_users.lookup(&event.uid);
+    if (is_admin) {
+        return 0;          
+    }
+
     bpf_get_current_comm(&event.comm, sizeof(event.comm));
     __builtin_memcpy(event.syscall, "inet_sock_set_state", sizeof("inet_sock_set_state"));
     
@@ -99,6 +78,11 @@ TRACEPOINT_PROBE(syscalls, sys_enter_connect) {
     bpf_probe_read_kernel(&event.ppid, sizeof(event.ppid), &task->real_parent->tgid);
     event.timestamp = bpf_ktime_get_ns();  
     event.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;  
+    u32 *is_admin = admin_users.lookup(&event.uid);
+    if (is_admin) {
+        return 0;          
+    }
+
     bpf_get_current_comm(&event.comm, sizeof(event.comm));  
     event.signal = 0;                               
     event.new_state = 0;
@@ -115,6 +99,11 @@ TRACEPOINT_PROBE(syscalls, sys_enter_bind) {
     bpf_probe_read_kernel(&event.ppid, sizeof(event.ppid), &task->real_parent->tgid);
     event.timestamp = bpf_ktime_get_ns();  
     event.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;  
+    u32 *is_admin = admin_users.lookup(&event.uid);
+    if (is_admin) {
+        return 0;          
+    }
+
     bpf_get_current_comm(&event.comm, sizeof(event.comm));  
     event.signal = 0;                               
     event.new_state = 0;
@@ -130,6 +119,11 @@ TRACEPOINT_PROBE(syscalls, sys_enter_openat) {
     bpf_probe_read_kernel(&event.ppid, sizeof(event.ppid), &task->real_parent->tgid);
     event.timestamp = bpf_ktime_get_ns();  
     event.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;  
+    u32 *is_admin = admin_users.lookup(&event.uid);
+    if (is_admin) {
+        return 0;          
+    }
+
     bpf_get_current_comm(&event.comm, sizeof(event.comm));  
     event.signal = 0;                               
     event.new_state = 0;
@@ -145,6 +139,11 @@ TRACEPOINT_PROBE(syscalls, sys_enter_socket) {
     bpf_probe_read_kernel(&event.ppid, sizeof(event.ppid), &task->real_parent->tgid);
     event.timestamp = bpf_ktime_get_ns();  
     event.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;  
+    u32 *is_admin = admin_users.lookup(&event.uid);
+    if (is_admin) {
+        return 0;          
+    }
+
     bpf_get_current_comm(&event.comm, sizeof(event.comm));  
     event.signal = 0;                               
     event.new_state = 0;

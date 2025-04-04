@@ -3,7 +3,7 @@ import ctypes as ct
 import socket
 import struct
 from time import strftime, localtime
-
+from pathlib import Path
 class ids_event_t(ct.Structure):
     _fields_ = [
         ("pid", ct.c_uint),
@@ -22,7 +22,6 @@ class ids_event_t(ct.Structure):
         ("src_port", ct.c_ushort),
         ("dst_port", ct.c_ushort),
     ]
-
 def handle_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(ids_event_t)).contents
     
@@ -46,7 +45,12 @@ def handle_event(cpu, data, size):
     print(f"{base}{' | ' if extras else ''}{' | '.join(extras)}")
 
 if __name__ == "__main__":
-    bpf = BPF(src_file="./hooks/tracepoints.c")
+    header = Path("common.h").read_text()
+    tracepoints = Path("./hooks/tracepoints.c").read_text()
+    probes = Path("./hooks/probes.c").read_text()
+    print(header)
+    combined = header + tracepoints + probes
+    bpf = BPF(text=combined)
     
     bpf["ids_events"].open_perf_buffer(handle_event)
     
